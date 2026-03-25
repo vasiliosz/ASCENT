@@ -10,3 +10,13 @@ debug
 results/ALL/ALL40/clones/ALL40-final_clone_object-haplotyped-g10-10000.Rds
 .debug/
 .Rproj.user
+.snakemake/
+._*
+.~*
+.Rhistory
+reference_solrun
+reference_fastq
+STAR-*
+star_index
+dntr2_workflow
+*.bak

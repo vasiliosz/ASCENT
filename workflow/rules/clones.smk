@@ -152,14 +152,15 @@ rule refine_clones_automatic:
         bins="resources/fixed-{binsize_refine}.bed",
         map="resources/fixed-{binsize_refine}.map.txt",
         gc="resources/fixed-{binsize_refine}.gc.txt",
-        cytoband="/wrk/resources/genomes/hg38-iGenome-ERCC/cytoBand.txt.gz",
+        cytoband=config["ref"]["cytobands"],
         good_bins="resources/goodbins-{binsize_refine}.bed",
         meta=out + "/{patient_id}/{patient_id}-metadata_long.tsv",
         qc_dna=out + "/{patient_id}/qc/{patient_id}-qc_dna.tsv"
     params:
         clone_gamma=0.5,
         clone_min_bins=10,
-        clone_boundary_filter=30
+        clone_boundary_filter=30,
+        clone_functions="workflow/scripts/clone_functions_forPaper.R"
     output:
         chr_heatmap=out+ "/{patient_id}/clones/{patient_id}-final-clones-refined-g{gamma}-b{binsize}-br{binsize_refine}.pdf",
         sc_heatmap=out + "/{patient_id}/clones/{patient_id}-final-refined-clones-heatmap-g{gamma}-b{binsize}-br{binsize_refine}.png",

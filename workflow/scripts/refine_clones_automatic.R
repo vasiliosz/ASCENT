@@ -1,5 +1,4 @@
 #Script for automatic clone refinement 
-setwd("/wrk/resources/ASCENT/")
 library(tidyverse)
 library(GenomicRanges)
 library(copynumber)
@@ -14,7 +13,7 @@ library(mgsub)
 options(scipen = 999)
 try(RhpcBLASctl::blas_set_num_threads(1))
 try(RhpcBLASctl::omp_set_num_threads(1))
-source("workflow/scripts/clone_functions_forPaper.R")
+source(snakemake@params[["clone_functions"]])
 threads <- snakemake@threads
 
 # Setup
