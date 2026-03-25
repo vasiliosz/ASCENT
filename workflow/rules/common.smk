@@ -5,7 +5,7 @@ import glob
 import yaml
 
 # Input validation
-if not os.path.exists(config["cells_dna"]) and not os.path.exists(config["cells_rna"]):
+if not os.path.exists(config["cells_dna"]) and not (config.get("cells_rna", "") and os.path.exists(config["cells_rna"])):
     raise ValueError("Neither RNA or DNA seedfiles provided. Stopping.")
 
 # Wildcard constraints
@@ -40,6 +40,7 @@ def validate_config():
         
         required_ref_keys = [
             "chr_list",
+            "chr_arms",
             "genome_bed",
             "blacklist",
             "maptrack"
@@ -99,7 +100,7 @@ def get_dna_fq2(wildcards):
 
 # RNA
 def is_rna_analysis():
-    return os.path.exists(config["cells_rna"])
+    return bool(config.get("cells_rna", "")) and os.path.exists(config["cells_rna"])
 
 def has_rna_data(patient_id):
     return cells_rna is not None and patient_id in cells_rna['patient_id'].values

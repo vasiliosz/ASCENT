@@ -1,6 +1,6 @@
 rule rna_fusions_seedfile:
-    input: 
-        config["cells_rna"]
+    input:
+        lambda wildcards: config["cells_rna"] if is_rna_analysis() else []
     output: 
         fusion_dir + "/{patient_id}.seedfile.txt"
     run:
