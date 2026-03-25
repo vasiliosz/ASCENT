@@ -1,22 +1,15 @@
 # Bin creation and preparation
 rule create_fixed_bins:
-    input: 
-    output: 
-        "resources/fixed-{binsize}_arms.bed"
+    input:
+        chr_arms=config["ref"]["chr_arms"]
+    output:
+        "resources/fixed-{binsize}.bed"
     params:
-        genome=config["ref"]["chr_list"]
+        chr_arms=config["ref"]["chr_arms"]
     shell:
         '''
-        bedtools makewindows -g {params.genome} -w {wildcards.binsize} > {output}
+        bedtools makewindows -b {params.chr_arms} -w {wildcards.binsize} > {output}
         '''
-
-rule fix_fixed_bins:
-    input:
-        bed="resources/fixed-{binsize}_arms.bed",
-        arms="grch38-chrarms_start_end.tsv"
-    output:
-        bed="resources/fixed-{binsize}.bed"
-    script: "../scripts/combine_chr_arms.R"
 
 
 rule create_bin_tracks:
@@ -179,7 +172,7 @@ rule bincount_fixed:
     output: dna_dir + "/{cell}/{cell}-bincounts-{binsize}.tsv"
     params:
         cellid=lambda wildcards: os.path.basename(wildcards.cell),
-        genome=config["ref"]["chr_list_intersect"]
+        genome=config["ref"]["chr_list"]
     shell:
         '''
         echo {params.cellid} > {output}
@@ -252,5 +245,7 @@ rule get_goodbins:
         gc_min=config["dna"]["bin_min_gc"],
         map_min=config["dna"]["bin_min_map"],
         centromeres=config["ref"].get("centromeres", None),
-        genome_gaps=config["ref"].get("gaps", None)
+        genome_gaps=config["ref"].get("gaps", None),
+        chr_arms=config["ref"]["chr_arms"],
+        min_bins_per_arm=config["dna"].get("min_bins_per_arm", 3)
     script: "../scripts/call_badbins.R"

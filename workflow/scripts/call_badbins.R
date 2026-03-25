@@ -167,7 +167,27 @@ bad.all <- bind_rows(bad.auto,bad.x) %>% distinct() %>% arrange(bin_unfilt)
   bad.all <- data.frame()
 }
 
-# Only filtered/good bins: 
-good.bins.final <- gc > gc_min & map > map_min & !bins$bin_unfilt %in% bad.all$bin_unfilt
+# Bins passing gc/map and statistical filters
+good.bins.gcmap_stat <- gc > gc_min & map > map_min & !bins$bin_unfilt %in% bad.all$bin_unfilt
+bins.gcmap_stat <- bins[good.bins.gcmap_stat, ]
+
+# Drop bins in arms with fewer than min_bins_per_arm good bins
+min_bins_per_arm <- snakemake@params[["min_bins_per_arm"]]
+chr_arms <- read.table(snakemake@params[["chr_arms"]], header=FALSE,
+                       col.names=c("chr", "start", "end", "arm"))
+bins.gcmap_stat <- bins.gcmap_stat %>%
+  left_join(chr_arms, by="chr") %>%
+  filter(start_coord >= start & end_coord <= end) %>%
+  mutate(chr_arm=paste0(chr, arm)) %>%
+  select(-start, -end, -arm)
+arm_counts <- table(bins.gcmap_stat$chr_arm)
+drop_arms  <- names(arm_counts[arm_counts < min_bins_per_arm])
+if(length(drop_arms) > 0) {
+  cat("Dropping arms with fewer than", min_bins_per_arm, "good bins:", paste(drop_arms, collapse=", "), "\n")
+}
+shortarm_bins <- bins.gcmap_stat$bin_unfilt[bins.gcmap_stat$chr_arm %in% drop_arms]
+
+# Only filtered/good bins:
+good.bins.final <- good.bins.gcmap_stat & !bins$bin_unfilt %in% shortarm_bins
 bins.final <- bins[good.bins.final, ] %>% mutate(bin=1:nrow(.))
 write_tsv(bins.final, snakemake@output[["goodbins"]])
