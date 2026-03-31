@@ -39,7 +39,7 @@ rule call_germline_hets:
     input:
         bam=out + "/{patient_id}/{patient_id}.pseudobulk.dna.bam",
         idx=out + "/{patient_id}/{patient_id}.pseudobulk.dna.bam.bai",
-        vcf_ref="/wrk/resources/genomes/1kGP_highcoverage_hg38/1kGP_high_coverage_Illumina.{chr}.SNV_AF5e4.vcf.gz"
+        vcf_ref=lambda wildcards: config["ref"]["vcf_1kg"].format(chr=wildcards.chr)
     output:
         cellsnp_dir=temp(directory(out + "/{patient_id}/{patient_id}_{chr}")),
         vcf_filtered=temp(out + "/{patient_id}/{patient_id}.het.filtered.{chr}.vcf.gz"),
@@ -106,10 +106,10 @@ rule phase_variants:
     input: 
         vcf=out + "/{patient_id}/{patient_id}.het.filtered.{chr}.vcf.gz",
         idx=out + "/{patient_id}/{patient_id}.het.filtered.{chr}.vcf.gz.tbi",
-        phase_ref="/wrk/resources/genomes/hgdp_1kg/phased_haplotypes_v2/hgdp1kgp_{chr}.filtered.SNV_INDEL.phased.shapeit5.bcf",
+        phase_ref=lambda wildcards: config["ref"]["phase_ref"].format(chr=wildcards.chr),
     output: temp(out + "/{patient_id}/{patient_id}.phased.{chr}.vcf.gz")
     params: 
-        genetic_map="/wrk/resources/genomes/hgdp_1kg/genetic_map_hg38_withX.txt.gz",
+        genetic_map=config["ref"]["genetic_map"],
         outprefix=out + "/{patient_id}/{patient_id}.phased.{chr}"
     conda: "../envs/snv.yaml"
     shell:

@@ -10,7 +10,7 @@ if not os.path.exists(config["cells_dna"]) and not (config.get("cells_rna", "") 
 
 # Wildcard constraints
 wildcard_constraints:
-    binsize="\d+"
+    binsize=r"\d+"
 
 # Config validation function
 def validate_config():
@@ -43,7 +43,10 @@ def validate_config():
             "chr_arms",
             "genome_bed",
             "blacklist",
-            "maptrack"
+            "maptrack",
+            "vcf_1kg",
+            "phase_ref",
+            "genetic_map"
         ]
         for key in required_ref_keys:
             if key not in config["ref"]:

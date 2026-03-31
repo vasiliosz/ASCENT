@@ -33,6 +33,11 @@ ref:
   cytobands: resources/cytoBand.txt.gz
   starfusion_ref: /wrk/resources/genomes/GRCh38_gencode_v44_CTAT_STARFusion/ctat_genome_lib_build_dir
 
+  # Phasing paths
+  vcf_1kg: /wrk/resources/genomes/1kGP_highcoverage_hg38/1kGP_high_coverage_Illumina.{chr}.SNV_AF5e4.vcf.gz
+  phase_ref: /wrk/resources/genomes/hgdp_1kg/phased_haplotypes_v2/hgdp1kgp_{chr}.filtered.SNV_INDEL.phased.shapeit5.bcf
+  genetic_map: /wrk/resources/genomes/hgdp_1kg/genetic_map_hg38_withX.txt.gz
+
 dna:
   binsize: [10000] #Can run multiple
   binsize_refine: [10000]
