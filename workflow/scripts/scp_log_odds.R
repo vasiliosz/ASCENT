@@ -41,14 +41,19 @@ pval.ploidy <- function(xmat, ploidy.rates) {
   setNames(c(cur.p, lods.up, lods.down), nm=c("logp.dens", "lods.up", "lods.down"))
 }
 
-ret.mat <- sapply(unique(scps_sc_f$dna_library_id), function(x) {
+ret.mat <- vapply(unique(scps_sc_f$dna_library_id), function(x) {
   xmat <- scps_sc_f %>% filter(dna_library_id == x)
   xmat<-xmat%>%filter(!ploidy==0) #Skip ploidy == 0 (happens very rarely -1 cell so far but messes with calculations)
+  if(nrow(xmat) == 0) return(c(logp.dens=NA_real_, lods.up=NA_real_, lods.down=NA_real_))
   pval.ploidy(xmat, ploidy.rates)
-})
+}, FUN.VALUE = numeric(3))
 
-df_wide <- as.data.frame(t(ret.mat)) %>%
-  rownames_to_column(var = "dna_library_id")
+if(length(ret.mat) == 0) {
+  df_wide <- tibble(dna_library_id=character(), logp.dens=numeric(), lods.up=numeric(), lods.down=numeric())
+} else {
+  df_wide <- as.data.frame(t(ret.mat)) %>%
+    rownames_to_column(var = "dna_library_id")
+}
 
 #Output plots
 
