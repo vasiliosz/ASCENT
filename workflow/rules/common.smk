@@ -243,21 +243,17 @@ normals_scaling = pd.DataFrame()
 normals_scaling_id = None
 if is_dna_analysis() and config["dna"]["normalize_to_panel"]:
     cells_normals = load_normal_data()
-    # 1. For outlier bins 
-    if os.path.exists(config["dna"]["normals_bins"]):
-        normals_bins = pd.read_table(config["dna"]["normals_bins"], header=0)
-        normals_bins_id = os.path.splitext(os.path.basename(config["dna"]["normals_bins"]))[0]
-    #else:
-    #    normals_bins = pd.DataFrame()
-    #    normals_bins_id = None
+    # 1. For outlier bins
+    if not os.path.exists(config["dna"]["normals_bins"]):
+        raise FileNotFoundError(f"normalize_to_panel=True but normals_bins seedfile not found: {config['dna']['normals_bins']}")
+    normals_bins = pd.read_table(config["dna"]["normals_bins"], header=0)
+    normals_bins_id = os.path.splitext(os.path.basename(config["dna"]["normals_bins"]))[0]
 
     # 2. For normal cell scaling
-    if os.path.exists(config["dna"]["normals_scaling"]):
-        normals_scaling = pd.read_table(config["dna"]["normals_scaling"], header=0)
-        normals_scaling_id = os.path.splitext(os.path.basename(config["dna"]["normals_scaling"]))[0]
-    #else:
-    #    normals_scaling = pd.DataFrame()
-    #    normals_scaling_id = None
+    if not os.path.exists(config["dna"]["normals_scaling"]):
+        raise FileNotFoundError(f"normalize_to_panel=True but normals_scaling seedfile not found: {config['dna']['normals_scaling']}")
+    normals_scaling = pd.read_table(config["dna"]["normals_scaling"], header=0)
+    normals_scaling_id = os.path.splitext(os.path.basename(config["dna"]["normals_scaling"]))[0]
 
 # Load patient-specific parameters
 patient_params_file = config["dna"]["patient_params"] if "patient_params" in config["dna"] else None
