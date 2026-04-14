@@ -21,6 +21,7 @@ clone_min_bins = snakemake@params[["clone_min_bins"]]
 clone_boundary_filter = snakemake@params[["clone_boundary_filter"]]
 use_normal_panel <- !is.null(snakemake@input[["normal_cells"]]) && length(snakemake@input[["normal_cells"]]) > 0
 clone_gamma = if(is.null(snakemake@params[["clone_gamma"]])) { if(use_normal_panel) 0.5 else 2.5 } else snakemake@params[["clone_gamma"]]
+clone_scale_range = c(snakemake@params[["min_scale_factor"]], snakemake@params[["max_scale_factor"]])
 
 
 # Paths
@@ -91,7 +92,7 @@ if(is.null(normal_counts_file)){
   d <- call_segments(d, gamma=clone_gamma, norm_segments = "ft_lowess_normal", norm_ratio="gcmap_normal", verbose=T)
 }
 d <- merge_small_segments(d, current="initial", revision="merged", min_bins_filter=clone_min_bins, boundary_filter=clone_boundary_filter, update_clones=T)
-d <- calc_cn_integers(d) 
+d <- calc_cn_integers(d, scale_range=clone_scale_range)
 plot_clone_heatmap(d)
 plot_clone_detail(d, region="chr1", norm=norm)
 d <- split_mixed_clones(d, residual_threshold = 0.3, improvement_threshold = 0.8, update_clones = T, verbose=F, plot=T)
@@ -103,7 +104,7 @@ d <- remove_small_clones(d, min_size_clone = 2)
 d<-fuzzy_merge_clones(d)
 plot_clone_heatmap(d)
 ### Re-calculate single cell copy numbers based on the refined segments 
-d <- calc_cell_cn(d)
+d <- calc_cell_cn(d, scale_range=clone_scale_range)
 
 #Remove cells that don't fit well 
 d <- remove_bad_cells(d, max_diff_bins = 1000, update_clones=T)

@@ -770,16 +770,17 @@ update_clone_metrics <- function(data, norm_slot=NULL, segs_slot=NULL, clone_slo
   return(data)
 }
 
-calc_cn_integers <- function(data, subset=NULL){
+calc_cn_integers <- function(data, subset=NULL, scale_range=NULL){
   cat("\nCalculating scale factors and copy number integers\n")
-  
+
   run_idx = TRUE # Default run all clones
   if(!is.null(subset)) {
     run_idx <- data[["clones"]][["clone_id"]] %in% subset
     if(sum(run_idx)==0) stop("Subset does not match any clones")
     cat("Using subset of clones:",paste(subset,collapse=", "),"\n")
   }
-  
+
+  # SCP-derived scale factors from cell metadata (median correct_scalefactor per clone)
   data[["clones"]][run_idx,] <- data[["clones"]][run_idx,] %>%
     mutate(
       scale_factor = map(cells, ~{
@@ -788,7 +789,27 @@ calc_cn_integers <- function(data, subset=NULL){
           pull(correct_scalefactor) %>%
           na.omit() %>%
           { if (length(.) == 0) NA_real_ else median(.) }
-      }),
+      })
+    )
+
+  # Fallback: for clones with NA scale factor (e.g. use_scp=False), search over scale_range
+  if(!is.null(scale_range)) {
+    stopifnot("scale_range must be length 2"=length(scale_range)==2)
+    s <- seq(scale_range[1], scale_range[2], length.out=100)
+    na_idx <- run_idx & sapply(data[["clones"]][["scale_factor"]], function(x) is.na(x) || is.null(x))
+    if(any(na_idx)) {
+      cat(sprintf("  %d clones missing SCP scale factor — searching range [%s, %s]\n",
+                  sum(na_idx), scale_range[1], scale_range[2]))
+      data[["clones"]][na_idx,] <- data[["clones"]][na_idx,] %>%
+        mutate(
+          scale_tests = map(segment_bins, ~sapply(s, function(sf) manhattan.dist(sf, .x, na.rm=T))),
+          scale_factor = map(scale_tests, ~s[which.min(.x)])
+        )
+    }
+  }
+
+  data[["clones"]][run_idx,] <- data[["clones"]][run_idx,] %>%
+    mutate(
       cn = map2(segment_bins, scale_factor, ~round(.x * .y)),
       residuals = map2(segment_means, scale_factor, ~abs(.x * .y - round(.x * .y)))
     )
@@ -1908,27 +1929,26 @@ rank_to_prob_exp <- function(distances, decay_rate = 1) {
   return(probs)
 }
 
-calc_cell_cn <- function(data, cell_idx=NULL, filter_segs=FALSE, cells_slot=NULL, segs_slot=NULL, clone_slot=NULL){
+calc_cell_cn <- function(data, cell_idx=NULL, filter_segs=FALSE, cells_slot=NULL, segs_slot=NULL, clone_slot=NULL, scale_range=NULL){
   if(is.null(cells_slot)) cells_slot <- get_norm_slot(data, "gcmap")
   try(RhpcBLASctl::blas_set_num_threads(1))
   try(RhpcBLASctl::omp_set_num_threads(1))
-  
+
   if(is.null(segs_slot)) segs_slot <- names(data[["segments"]])[length(data[["segments"]])]
   if(is.null(clone_slot)) clone_slot <- names(data[["cells"]])[max(grep("clone_", names(data[["cells"]])))]
   stopifnot("cells_slot should be gcmap or gcmap_normal"=
-              cells_slot %in% c("gcmap","gcmap_normal"), 
+              cells_slot %in% c("gcmap","gcmap_normal"),
             "segs_slot not found"=
               segs_slot %in% names(data[["segments"]]),
             "clone slot not found"=
               clone_slot %in% names(data[["cells"]]))
-  
+
   segs <- data[["segments"]][[segs_slot]]
   bins <- data[["bins"]][["good"]]
   if((length(cell_idx)==1 & is.logical(cell_idx)) | is.null(cell_idx)) cell_idx <- rep(TRUE, nrow(data[["cells"]]))
   clone_idx <- norm_idx <- cn_idx <- cell_idx
   cat(sprintf("Running %s cells from custom index", sum(cell_idx)),"\n")
-  # }
-  
+
   cat(sprintf("Normalizing (%s) %d single cells...\n", cells_slot, sum(norm_idx)))
   data[["cells"]][[cells_slot]][norm_idx] <- mclapply(data[["cells"]][["raw_counts"]][norm_idx], function(x){
     x <- x[bins$id]
@@ -1940,7 +1960,7 @@ calc_cell_cn <- function(data, cell_idx=NULL, filter_segs=FALSE, cells_slot=NULL
     }
     return(rm)
   }, mc.cores=threads)
-  
+
   cat(sprintf("Calculating scale factors and cn integers in %d single cells...\n", sum(cn_idx)))
   data[["cells"]][["segment_means"]][cn_idx] <- lapply(data[["cells"]][[cells_slot]][cn_idx], function(x){
     r <- sapply(1:nrow(segs), function(i) {
@@ -1951,19 +1971,32 @@ calc_cell_cn <- function(data, cell_idx=NULL, filter_segs=FALSE, cells_slot=NULL
     r
   })
   data[["cells"]][["segment_bins"]][cn_idx] <- lapply(data[["cells"]][["segment_means"]][cn_idx], function(x) rep(x, segs$n.probes))
-  # data[["cells"]][["scale_tests"]][cn_idx] <- mclapply(data[["cells"]][["segment_bins"]][cn_idx], function(x){
-  #   sapply(s, function(sf) manhattan.dist(sf, x, na.rm = T))
-  # }, mc.cores=threads)
-  # data[["cells"]][["scale_factor"]][cn_idx] <- lapply(data[["cells"]][["scale_tests"]][cn_idx], function(x) s[which.min(x)])
-  # 
-  
+
+  # SCP-derived scale factor: use correct_scalefactor from cell metadata where available
   for (i in which(cn_idx)) {
     val <- data[["cells"]]$correct_scalefactor[i]
     if (!is.na(val)) {
       data[["cells"]]$scale_factor[[i]] <- val
     }
   }
-  
+
+  # Fallback: for cells with NA scale factor (e.g. use_scp=False), search over scale_range
+  if(!is.null(scale_range)) {
+    stopifnot("scale_range must be length 2"=length(scale_range)==2)
+    s <- seq(scale_range[1], scale_range[2], length.out=100)
+    na_cell_idx <- which(cn_idx) [sapply(which(cn_idx), function(i) {
+      v <- data[["cells"]]$scale_factor[[i]]
+      is.null(v) || (length(v)==1 && is.na(v))
+    })]
+    if(length(na_cell_idx) > 0) {
+      cat(sprintf("  %d cells missing SCP scale factor — searching range [%s, %s]\n",
+                  length(na_cell_idx), scale_range[1], scale_range[2]))
+      data[["cells"]][["scale_factor"]][na_cell_idx] <- mclapply(data[["cells"]][["segment_bins"]][na_cell_idx], function(x){
+        s[which.min(sapply(s, function(sf) manhattan.dist(sf, x, na.rm=T)))]
+      }, mc.cores=threads)
+    }
+  }
+
   data[["cells"]][["cn"]][cn_idx] <- lapply(which(cn_idx), function(i){
     round(data[["cells"]][["segment_bins"]][[i]] * data[["cells"]][["scale_factor"]][[i]])
   })

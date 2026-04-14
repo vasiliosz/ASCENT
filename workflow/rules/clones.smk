@@ -160,6 +160,8 @@ rule refine_clones_automatic:
         clone_gamma=lambda wildcards: get_patient_param(wildcards.patient_id, 'clone_gamma')[0],
         clone_min_bins=lambda wildcards: get_patient_param(wildcards.patient_id, 'clone_min_bins')[0],
         clone_boundary_filter=lambda wildcards: get_patient_param(wildcards.patient_id, 'clone_boundary_filter')[0],
+        min_scale_factor=config["dna"]["min_scale_factor"],
+        max_scale_factor=config["dna"]["max_scale_factor"],
         clone_functions="workflow/scripts/clone_functions_forPaper.R"
     output:
         chr_heatmap=out+ "/{patient_id}/clones/{patient_id}-final-clones-refined-g{gamma}-b{binsize}-br{binsize_refine}.pdf",
