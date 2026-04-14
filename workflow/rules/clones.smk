@@ -69,7 +69,7 @@ rule find_clones:
         all_bins="resources/fixed-{binsize}.bed",
         dna_qc=out + "/{patient_id}/qc/{patient_id}-qc_dna.tsv",
         metadata_patient=out + "/{patient_id}/{patient_id}-metadata_long.tsv",
-        logodds=out + "/{patient_id}/clones/{patient_id}-log_odds_df-scCN-{binsize}-g{gamma}.tsv",
+        logodds=out + "/{patient_id}/clones/{patient_id}-log_odds_df-scCN-{binsize}-g{gamma}.tsv" if config["dna"].get("use_scp", True) else [],
         rna_phase=lambda wildcards: out + "/{patient_id}/{patient_id}-rna_phases.txt" if has_rna_data(wildcards.patient_id) and config["dna"]["exclude_sphase"] else []
     output:
         clones=out + "/{patient_id}/clones/{patient_id}-clones-{method}-g{gamma}-{binsize}.txt",
@@ -148,7 +148,7 @@ rule refine_clones_automatic:
         counts=out +"/{patient_id}/{patient_id}-bincounts-{binsize_refine}.tsv.gz",
         normal_cells="resources/normals_scaling-" + str(normals_scaling_id) + "-{binsize_refine}.tsv.gz" if config["dna"]["normalize_to_panel"] else [],
         sf=out + "/{patient_id}/clones/{patient_id}-scalefactors-g{gamma}-{binsize}.txt",
-        logodds=out + "/{patient_id}/clones/{patient_id}-log_odds_df-scCN-{binsize}-g{gamma}.tsv",
+        logodds=out + "/{patient_id}/clones/{patient_id}-log_odds_df-scCN-{binsize}-g{gamma}.tsv" if config["dna"].get("use_scp", True) else [],
         bins="resources/fixed-{binsize_refine}.bed",
         map="resources/fixed-{binsize_refine}.map.txt",
         gc="resources/fixed-{binsize_refine}.gc.txt",
@@ -157,9 +157,9 @@ rule refine_clones_automatic:
         meta=out + "/{patient_id}/{patient_id}-metadata_long.tsv",
         qc_dna=out + "/{patient_id}/qc/{patient_id}-qc_dna.tsv"
     params:
-        clone_gamma=0.5,
-        clone_min_bins=10,
-        clone_boundary_filter=30,
+        clone_gamma=lambda wildcards: get_patient_param(wildcards.patient_id, 'clone_gamma')[0],
+        clone_min_bins=lambda wildcards: get_patient_param(wildcards.patient_id, 'clone_min_bins')[0],
+        clone_boundary_filter=lambda wildcards: get_patient_param(wildcards.patient_id, 'clone_boundary_filter')[0],
         clone_functions="workflow/scripts/clone_functions_forPaper.R"
     output:
         chr_heatmap=out+ "/{patient_id}/clones/{patient_id}-final-clones-refined-g{gamma}-b{binsize}-br{binsize_refine}.pdf",

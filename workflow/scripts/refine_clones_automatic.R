@@ -19,6 +19,8 @@ threads <- snakemake@threads
 # Setup
 clone_min_bins = snakemake@params[["clone_min_bins"]]
 clone_boundary_filter = snakemake@params[["clone_boundary_filter"]]
+use_normal_panel <- !is.null(snakemake@input[["normal_cells"]]) && length(snakemake@input[["normal_cells"]]) > 0
+clone_gamma = if(is.null(snakemake@params[["clone_gamma"]])) { if(use_normal_panel) 0.5 else 2.5 } else snakemake@params[["clone_gamma"]]
 
 
 # Paths
@@ -26,7 +28,11 @@ clone_file <- file.path(snakemake@input[["clones"]])
 counts_file <- file.path(snakemake@input[["counts"]])
 normal_counts_file <- snakemake@input[["normal_cells"]] 
 sf<-read.table(snakemake@input[["sf"]], col.names = c("dna_library_id", "scale_factor"))
-logodds<-read_tsv(snakemake@input[["logodds"]])
+if (length(snakemake@input[["logodds"]]) > 0) {
+  logodds <- read_tsv(snakemake@input[["logodds"]])
+} else {
+  logodds <- tibble(dna_library_id = character(), multiplication = numeric())
+}
 
 bins_all <- load_bins(bins_file = snakemake@input[["bins"]],
                       map_file = snakemake@input[["map"]],
@@ -80,11 +86,11 @@ d <- create_pseudobulk_analysis(counts_matrix = counts,
 # Processing
 d <- normalize_counts(d, methods=c("ft_lowess", "gcmap"))
 if(is.null(normal_counts_file)){
-  d <- call_segments(d, gamma=2.5, norm_segments = "ft_lowess", norm_ratio="gcmap", verbose=T)
+  d <- call_segments(d, gamma=clone_gamma, norm_segments = "ft_lowess", norm_ratio="gcmap", verbose=T)
 } else {
-  d <- call_segments(d, gamma=0.5, norm_segments = "ft_lowess_normal", norm_ratio="gcmap_normal", verbose=T)
+  d <- call_segments(d, gamma=clone_gamma, norm_segments = "ft_lowess_normal", norm_ratio="gcmap_normal", verbose=T)
 }
-d <- merge_small_segments(d, current="initial", revision="merged", min_bins_filter=10, boundary_filter=40, update_clones=T)
+d <- merge_small_segments(d, current="initial", revision="merged", min_bins_filter=clone_min_bins, boundary_filter=clone_boundary_filter, update_clones=T)
 d <- calc_cn_integers(d) 
 plot_clone_heatmap(d)
 plot_clone_detail(d, region="chr1", norm=norm)

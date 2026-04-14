@@ -246,10 +246,13 @@ get_clones_dist <- function(x, min_cells=NULL, threads=1, metric="manhattan", pl
 mtx <- as.matrix(read_tsv(snakemake@input[["cn"]]))
 if(nrow(mtx) != nrow(bins)) stop("Unequal length of bin and mtx")
 
-#Adjust copy numbers according to logodds ratios 
-logodds<-read_tsv(snakemake@input[["logodds"]])
-
-mtx_adjusted <- sweep(mtx, 2, logodds$multiplication[match(colnames(mtx), logodds$dna_library_id)] %>% replace_na(1), `*`)
+#Adjust copy numbers according to logodds ratios
+if (length(snakemake@input[["logodds"]]) > 0) {
+  logodds <- read_tsv(snakemake@input[["logodds"]])
+  mtx_adjusted <- sweep(mtx, 2, logodds$multiplication[match(colnames(mtx), logodds$dna_library_id)] %>% replace_na(1), `*`)
+} else {
+  mtx_adjusted <- mtx
+}
 
 
 # Filter out small segments

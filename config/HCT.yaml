@@ -63,7 +63,12 @@ dna:
   max_dup_frac: 0.50
   # Ploidy scaling factor heuristics
   min_scale_factor: 1.2
-  max_scale_factor: 4.5 
+  max_scale_factor: 4.5
+  use_scp: True
+  # Clone refinement params (clone_gamma: null uses normal-conditional default: 0.5 with panel, 2.5 without)
+  clone_gamma: ~
+  clone_min_bins: 10
+  clone_boundary_filter: 40
   # Single-cell joint segmentation and clustering
   gamma: [10]
   dim_reduction: ["umap"] # umap, lv, L1 recognized

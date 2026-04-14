@@ -36,7 +36,11 @@ def get_targets():
             expand(out + "/{patient_id}/{patient_id}-clone_stats.txt", patient_id=dna_patient_ids),
             expand(out + "/{patient_id}/{patient_id}-baf.txt.gz", patient_id=dna_patient_ids), 
             expand(out + "/{patient_id}/dna_bam_index_done", patient_id=dna_patient_ids),
-            expand(out + "/{patient_id}/medicc/g{gamma}-b{binsize}-br{binsize_refine}/.medicc_done", patient_id=dna_patient_ids, binsize=config["dna"]["binsize"], binsize_refine=config["dna"]["binsize_refine"], gamma=config["dna"]["gamma"])
+            [out + f"/{patient_id}/medicc/g{gamma}-b{binsize}-br{binsize_refine}/.medicc_done"
+             for patient_id in dna_patient_ids
+             for gamma in get_patient_param(patient_id, 'gamma')
+             for binsize in config["dna"]["binsize"]
+             for binsize_refine in config["dna"]["binsize_refine"]]
         ])
     
     if is_rna_analysis():

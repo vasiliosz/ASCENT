@@ -256,11 +256,11 @@ if is_dna_analysis() and config["dna"]["normalize_to_panel"]:
     normals_scaling_id = os.path.splitext(os.path.basename(config["dna"]["normals_scaling"]))[0]
 
 # Load patient-specific parameters
-patient_params_file = config["dna"]["patient_params"] if "patient_params" in config["dna"] else None
+patient_params_file = config["dna"].get("patient_params") or None
 patient_params = {}
-if os.path.exists(patient_params_file):
+if patient_params_file and os.path.exists(patient_params_file):
     with open(patient_params_file) as f:
-        patient_params = yaml.safe_load(f)
+        patient_params = yaml.safe_load(f) or {}
 
 def get_patient_param(patient_id, param_name):
     """Get parameter value for patient, falling back to config default if not specified."""
