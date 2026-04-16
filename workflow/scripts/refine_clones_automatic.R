@@ -31,8 +31,12 @@ normal_counts_file <- snakemake@input[["normal_cells"]]
 sf<-read.table(snakemake@input[["sf"]], col.names = c("dna_library_id", "scale_factor"))
 if (length(snakemake@input[["logodds"]]) > 0) {
   logodds <- read_tsv(snakemake@input[["logodds"]])
+  logodds <- left_join(sf, logodds)
+  logodds$correct_scalefactor <- logodds$scale_factor * logodds$multiplication
+  logodds <- logodds %>% mutate(correct_scalefactor = coalesce(correct_scalefactor, scale_factor))
 } else {
-  logodds <- tibble(dna_library_id = character(), multiplication = numeric())
+  # use_scp=False: leave correct_scalefactor NA so calc_cn_integers uses range search
+  logodds <- sf %>% mutate(correct_scalefactor = NA_real_)
 }
 
 bins_all <- load_bins(bins_file = snakemake@input[["bins"]],
@@ -44,24 +48,17 @@ bins_good <- read_tsv(snakemake@input[["good_bins"]], skip=1,
 counts <- as.matrix(data.table::fread(counts_file))
 clones <- read_tsv(clone_file) %>% select(dna_library_id, clone=clone_final)
 
-#Create single cell level scale factor 
-logodds<-left_join(sf, logodds)
-logodds$correct_scalefactor<-logodds$scale_factor*logodds$multiplication
-logodds <- logodds %>%
-  mutate(correct_scalefactor = coalesce(correct_scalefactor, scale_factor))
-
-clones<-left_join(clones, logodds)
+clones <- left_join(clones, logodds)
 
 meta_seed <- read_tsv(snakemake@input[["meta"]])
-meta_qc_dna <- read_tsv(snakemake@input[["qc_dna"]]) %>% 
+meta_qc_dna <- read_tsv(snakemake@input[["qc_dna"]]) %>%
   mutate(cell_id=dna_to_cellid(dna_library_id)) %>% select(-dna_library_id, -starts_with("dna_frac"), -starts_with("fq"))
 
-cell_data <- meta_seed %>% 
-  #left_join(meta_phase, by="cell_id") %>% 
-  #left_join(meta_qc_rna, by="cell_id") %>% 
-  left_join(meta_qc_dna, by="cell_id") %>% 
-  left_join(clones, by="dna_library_id") %>% 
-  left_join(logodds)%>%
+cell_data <- meta_seed %>%
+  #left_join(meta_phase, by="cell_id") %>%
+  #left_join(meta_qc_rna, by="cell_id") %>%
+  left_join(meta_qc_dna, by="cell_id") %>%
+  left_join(clones, by="dna_library_id") %>%
   select(dna_library_id, clone, everything()) %>% 
   filter(!is.na(dna_library_id)) # Added 250128: Hit-picking in some plates will mean different number of RNA vs DNA libraries in a plate 
 
