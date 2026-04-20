@@ -391,7 +391,7 @@ if(any(!is.na(cl.all.m$timepoint))){
     mutate(clone=factor(dna_class_revised, levels=clones.mtx.hclust$labels[clones.mtx.hclust$order]),
            excluded=grepl("*_S$|*_G2M$|*_0$",clone)) %>% 
     ggplot(aes(x=clone, y=n, fill=timepoint)) + geom_bar(stat="identity", show.legend = T, position="stack") +
-    scale_fill_manual(values=timepoint_cols[times]) + guides(fill=guide_legend(title = NULL))
+    scale_fill_manual(values=get_timepoint_colors(times)) + guides(fill=guide_legend(title = NULL))
 } else {
   p.hist <- cl.all %>% 
     group_by(dna_class_revised) %>% summarize(n=n()) %>% 
@@ -495,7 +495,7 @@ if(any(!is.na(m$timepoint))){
     times <- unique(names(timepoints.list[[i]]))
     p.tree <- ggtree(tree, aes(color=droplevels(timepoint)), ladderize = F) +
       layout_dendrogram() +
-      scale_color_manual(values = timepoint_cols[times]) +
+      scale_color_manual(values = get_timepoint_colors(times)) +
       geom_treescale(fontsize=4, linesize=1, offset=20) +
       guides(color=guide_legend(override.aes=list(size=3), nrow=3, title.position = "top", title = "Timepoints"),
              shape=guide_legend(title.position="top", title="Excluded")) +
@@ -536,7 +536,7 @@ if(any(!is.na(cl.all.merged.m$timepoint))){
     mutate(dna_class=factor(dna_class, levels=cn.clones.hclust$labels[cn.clones.hclust$order]),
            excluded=grepl("*_S$|*_G2M$|*_0$",dna_class)) %>% 
     ggplot(aes(x=dna_class, y=n, fill=timepoint)) + geom_bar(stat="identity", show.legend = T, position="stack") +
-    scale_fill_manual(values=timepoint_cols[times]) + guides(fill=guide_legend(title = NULL))
+    scale_fill_manual(values=get_timepoint_colors(times)) + guides(fill=guide_legend(title = NULL))
 } else {
   p.hist <- cl.all.merged %>% 
     group_by(dna_class) %>% summarize(n=n()) %>% 
@@ -659,7 +659,7 @@ ha <- rowAnnotation(clone=meta$dna_class,
                     classProb=meta$dna_class_prob,
                     # scp=anno_barplot(meta$scp,bar_width = 1, border = F, baseline="min"),
                     reads=anno_barplot(log10(meta$bam_read_pairs), bar_width=1, border=F, baseline = "min"),
-                    col=list(clone=clone_colors, clone_rev=clone_colors, clone_merge=clone_colors, time=timepoint_cols,
+                    col=list(clone=clone_colors, clone_rev=clone_colors, clone_merge=clone_colors, time=get_timepoint_colors(unique(meta$timepoint)),
                              rna_qc=rna_qc_colors, dups=col_fun_dups, classProb=col_fun_prob),
                     show_legend=T, annotation_name_gp = gpar(fontsize=8))
 
@@ -768,7 +768,7 @@ ha2 <- rowAnnotation(dna_qc=mtx.meta$dna_qc,
                      reads=anno_barplot(log10(mtx.meta$bam_read_pairs+1), bar_width=1, border=F, baseline = "min"),
                      col=list(rna_qc=rna_qc_colors, dna_qc=rna_qc_colors, clone_qc=rna_qc_colors,
                               dups=col_fun_dups, clone=clone_colors, clone_rev=clone_colors, clone_merge=clone_colors,
-                              time=timepoint_cols),
+                              time=get_timepoint_colors(unique(mtx.meta$timepoint))),
                      show_legend=T, annotation_name_gp = gpar(fontsize=8))
 
 png(snakemake@output[["heatmap_raw"]], width=2000,height=1400,units="px",res=150)

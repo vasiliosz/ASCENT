@@ -249,7 +249,11 @@ if(nrow(mtx) != nrow(bins)) stop("Unequal length of bin and mtx")
 #Adjust copy numbers according to logodds ratios
 if (length(snakemake@input[["logodds"]]) > 0) {
   logodds <- read_tsv(snakemake@input[["logodds"]])
-  mtx_adjusted <- sweep(mtx, 2, logodds$multiplication[match(colnames(mtx), logodds$dna_library_id)] %>% replace_na(1), `*`)
+  if (nrow(logodds) > 0) { 
+    mtx_adjusted <- sweep(mtx, 2, logodds$multiplication[match(colnames(mtx), logodds$dna_library_id)] %>% replace_na(1), `*`)
+  } else { # If empty logodds files, skip adjustment
+    mtx_adjusted <- mtx
+  }
 } else {
   mtx_adjusted <- mtx
 }
