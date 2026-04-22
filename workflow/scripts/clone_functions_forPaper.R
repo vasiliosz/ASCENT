@@ -294,8 +294,10 @@ calc_normal_scale_factors <- function(normal_counts, bins, good_bins_idx=NULL, g
 }
 
 create_pseudobulk_analysis <- function(counts_matrix, bins_info, good_bins, cell_metadata, normal_counts = NULL,
-                                       params = list(min_bins = 10, min_cells = 8, gamma = 1, recall_mad_filter = 7, scale_range = c(1.5, 4.5))
+                                       params = list()
 ) {
+  default_params <- list(min_bins = 10, min_cells = 8, gamma = 1, recall_mad_filter = 7, boundary_filter = 40)
+  params <- modifyList(default_params, params)
   # Input validation
   stopifnot(
     "Bins info must match counts" = 
@@ -773,6 +775,10 @@ update_clone_metrics <- function(data, norm_slot=NULL, segs_slot=NULL, clone_slo
 calc_cn_integers <- function(data, subset=NULL, scale_range=NULL){
   cat("\nCalculating scale factors and copy number integers\n")
 
+  if(is.null(scale_range)) scale_range <- data[["parameters"]][["scale_range"]]
+  stopifnot("scale_range not provided and missing from data$parameters" = !is.null(scale_range),
+            "scale_range must be length 2" = length(scale_range) == 2)
+
   run_idx = TRUE # Default run all clones
   if(!is.null(subset)) {
     run_idx <- data[["clones"]][["clone_id"]] %in% subset
@@ -793,19 +799,16 @@ calc_cn_integers <- function(data, subset=NULL, scale_range=NULL){
     )
 
   # Fallback: for clones with NA scale factor (e.g. use_scp=False), search over scale_range
-  if(!is.null(scale_range)) {
-    stopifnot("scale_range must be length 2"=length(scale_range)==2)
-    s <- seq(scale_range[1], scale_range[2], length.out=100)
-    na_idx <- run_idx & sapply(data[["clones"]][["scale_factor"]], function(x) is.na(x) || is.null(x))
-    if(any(na_idx)) {
-      cat(sprintf("  %d clones missing SCP scale factor — searching range [%s, %s]\n",
-                  sum(na_idx), scale_range[1], scale_range[2]))
-      data[["clones"]][na_idx,] <- data[["clones"]][na_idx,] %>%
-        mutate(
-          scale_tests = map(segment_bins, ~sapply(s, function(sf) manhattan.dist(sf, .x, na.rm=T))),
-          scale_factor = map(scale_tests, ~s[which.min(.x)])
-        )
-    }
+  s <- seq(scale_range[1], scale_range[2], length.out=100)
+  na_idx <- run_idx & sapply(data[["clones"]][["scale_factor"]], function(x) is.na(x) || is.null(x))
+  if(any(na_idx)) {
+    cat(sprintf("  %d clones missing SCP scale factor — searching range [%s, %s]\n",
+                sum(na_idx), scale_range[1], scale_range[2]))
+    data[["clones"]][na_idx,] <- data[["clones"]][na_idx,] %>%
+      mutate(
+        scale_tests = map(segment_bins, ~sapply(s, function(sf) manhattan.dist(sf, .x, na.rm=T))),
+        scale_factor = map(scale_tests, ~s[which.min(.x)])
+      )
   }
 
   data[["clones"]][run_idx,] <- data[["clones"]][run_idx,] %>%
@@ -1344,7 +1347,13 @@ merge_duplicate_clones <- function(data, segs_slot=NULL, clone_slot=NULL){
   m <- do.call(cbind, cn_segs)
   colnames(m) <- data$clones$clone_id
   m <- m[,colnames(m)!="0"]
-  
+
+  all_na_cols <- colnames(m)[apply(m, 2, function(x) all(is.na(x)))]
+  if(length(all_na_cols) > 0) {
+    stop(sprintf("merge_duplicate_clones: %d clone(s) have all-NA cn at segment starts: %s. Upstream step left cn unpopulated (check scale_factor / scale_range).",
+                 length(all_na_cols), paste(all_na_cols, collapse=", ")))
+  }
+
   # Compare full columns and group them
   dups <- duplicated(t(m)) | duplicated(t(m), fromLast=TRUE)
   if(!any(dups)){
@@ -1414,6 +1423,13 @@ fuzzy_merge_clones <- function(data, segs_slot=NULL, clone_slot=NULL, max_cn=6, 
   r <- do.call(cbind, res_segs)
   colnames(m) <- data$clones$clone_id
   m <- m[,colnames(m)!="0"]
+
+  all_na_cols <- colnames(m)[apply(m, 2, function(x) all(is.na(x)))]
+  if(length(all_na_cols) > 0) {
+    stop(sprintf("fuzzy_merge_clones: %d clone(s) have all-NA cn at segment starts: %s. Upstream step left cn unpopulated (check scale_factor / scale_range).",
+                 length(all_na_cols), paste(all_na_cols, collapse=", ")))
+  }
+
   # Mask values over max_cn
   m[m > max_cn] <- NA
   colnames(r)<-data$clones$clone_id
@@ -1936,12 +1952,17 @@ calc_cell_cn <- function(data, cell_idx=NULL, filter_segs=FALSE, cells_slot=NULL
 
   if(is.null(segs_slot)) segs_slot <- names(data[["segments"]])[length(data[["segments"]])]
   if(is.null(clone_slot)) clone_slot <- names(data[["cells"]])[max(grep("clone_", names(data[["cells"]])))]
+  if(is.null(scale_range)) scale_range <- data[["parameters"]][["scale_range"]]
   stopifnot("cells_slot should be gcmap or gcmap_normal"=
               cells_slot %in% c("gcmap","gcmap_normal"),
             "segs_slot not found"=
               segs_slot %in% names(data[["segments"]]),
             "clone slot not found"=
-              clone_slot %in% names(data[["cells"]]))
+              clone_slot %in% names(data[["cells"]]),
+            "scale_range not provided and missing from data$parameters"=
+              !is.null(scale_range),
+            "scale_range must be length 2"=
+              length(scale_range) == 2)
 
   segs <- data[["segments"]][[segs_slot]]
   bins <- data[["bins"]][["good"]]
@@ -1981,20 +2002,17 @@ calc_cell_cn <- function(data, cell_idx=NULL, filter_segs=FALSE, cells_slot=NULL
   }
 
   # Fallback: for cells with NA scale factor (e.g. use_scp=False), search over scale_range
-  if(!is.null(scale_range)) {
-    stopifnot("scale_range must be length 2"=length(scale_range)==2)
-    s <- seq(scale_range[1], scale_range[2], length.out=100)
-    na_cell_idx <- which(cn_idx) [sapply(which(cn_idx), function(i) {
-      v <- data[["cells"]]$scale_factor[[i]]
-      is.null(v) || (length(v)==1 && is.na(v))
-    })]
-    if(length(na_cell_idx) > 0) {
-      cat(sprintf("  %d cells missing SCP scale factor — searching range [%s, %s]\n",
-                  length(na_cell_idx), scale_range[1], scale_range[2]))
-      data[["cells"]][["scale_factor"]][na_cell_idx] <- mclapply(data[["cells"]][["segment_bins"]][na_cell_idx], function(x){
-        s[which.min(sapply(s, function(sf) manhattan.dist(sf, x, na.rm=T)))]
-      }, mc.cores=threads)
-    }
+  s <- seq(scale_range[1], scale_range[2], length.out=100)
+  na_cell_idx <- which(cn_idx) [sapply(which(cn_idx), function(i) {
+    v <- data[["cells"]]$scale_factor[[i]]
+    is.null(v) || (length(v)==1 && is.na(v))
+  })]
+  if(length(na_cell_idx) > 0) {
+    cat(sprintf("  %d cells missing SCP scale factor — searching range [%s, %s]\n",
+                length(na_cell_idx), scale_range[1], scale_range[2]))
+    data[["cells"]][["scale_factor"]][na_cell_idx] <- mclapply(data[["cells"]][["segment_bins"]][na_cell_idx], function(x){
+      s[which.min(sapply(s, function(sf) manhattan.dist(sf, x, na.rm=T)))]
+    }, mc.cores=threads)
   }
 
   data[["cells"]][["cn"]][cn_idx] <- lapply(which(cn_idx), function(i){

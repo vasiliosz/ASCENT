@@ -75,11 +75,15 @@ if (!use_normal_scaling) {
 
 
 # Load cnv data
-d <- create_pseudobulk_analysis(counts_matrix = counts, 
-                                bins_info = bins_all, 
-                                good_bins = bins_good$id, 
+d <- create_pseudobulk_analysis(counts_matrix = counts,
+                                bins_info = bins_all,
+                                good_bins = bins_good$id,
                                 cell_metadata = cell_data,
-                                normal_counts = normal_counts_file)
+                                normal_counts = normal_counts_file,
+                                params = list(scale_range = clone_scale_range,
+                                              gamma = clone_gamma,
+                                              min_bins = clone_min_bins,
+                                              boundary_filter = clone_boundary_filter))
 
 # Processing
 d <- normalize_counts(d, methods=c("ft_lowess", "gcmap"))
@@ -89,19 +93,21 @@ if(is.null(normal_counts_file)){
   d <- call_segments(d, gamma=clone_gamma, norm_segments = "ft_lowess_normal", norm_ratio="gcmap_normal", verbose=T)
 }
 d <- merge_small_segments(d, current="initial", revision="merged", min_bins_filter=clone_min_bins, boundary_filter=clone_boundary_filter, update_clones=T)
-d <- calc_cn_integers(d, scale_range=clone_scale_range)
-plot_clone_heatmap(d)
-plot_clone_detail(d, region="chr1", norm=norm)
-d <- split_mixed_clones(d, residual_threshold = 0.3, improvement_threshold = 0.8, update_clones = T, verbose=F, plot=T)
+d <- calc_cn_integers(d)
+# Debug
+# plot_clone_heatmap(d)
+# plot_clone_detail(d, region="chr1", norm=norm)
+d <- split_mixed_clones(d, residual_threshold = 0.3, improvement_threshold = 0.8, update_clones = T, verbose=F, plot=F)
 d <- mask_high_residuals(d, max_residual = 0.3, clone_filter_fraction=0.3, update_clones=T)
 d <- remove_bad_clones(d)
 d <- refine_segments_from_cn(d)
 d <- merge_duplicate_clones(d)
 d <- remove_small_clones(d, min_size_clone = 2)
-d<-fuzzy_merge_clones(d)
-plot_clone_heatmap(d)
+d <- fuzzy_merge_clones(d)
+# plot_clone_heatmap(d)
+
 ### Re-calculate single cell copy numbers based on the refined segments 
-d <- calc_cell_cn(d, scale_range=clone_scale_range)
+d <- calc_cell_cn(d)
 
 #Remove cells that don't fit well 
 d <- remove_bad_cells(d, max_diff_bins = 1000, update_clones=T)
